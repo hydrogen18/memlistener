@@ -2,10 +2,12 @@ package memlistener
 
 import "net"
 import "errors"
+import "sync/atomic"
 
 type MemoryListener struct {
-	connections chan net.Conn
-	state       chan int
+	connections   chan net.Conn
+	state         chan int
+	isStateClosed uint32
 }
 
 func NewMemoryListener() *MemoryListener {
@@ -25,12 +27,8 @@ func (ml *MemoryListener) Accept() (net.Conn, error) {
 }
 
 func (ml *MemoryListener) Close() error {
-	select {
-	case _, ok := <-ml.state:
-		if ok {
-			close(ml.state)
-		}
-	default:
+	if atomic.CompareAndSwapUint32(&ml.isStateClosed, 0, 1) {
+		close(ml.state)
 	}
 	return nil
 }
